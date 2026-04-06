@@ -42,16 +42,15 @@ func changeEvent(old, new *InstanceMetadata, changed []string) Event {
 }
 
 // send sends an event on ch. Drops the event if the buffer is full.
-// Returns false if ctx is done.
+// Returns false if ctx is done. When ctx is done AND the buffer is full,
+// Go may pick either case non-deterministically — this is harmless because
+// the poll loop checks ctx.Done() on the next iteration regardless.
 func send(ctx context.Context, ch chan<- Event, ev Event) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	default:
-	}
 	select {
 	case ch <- ev:
 		return true
+	case <-ctx.Done():
+		return false
 	default:
 		return true // buffer full, drop event
 	}
