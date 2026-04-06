@@ -79,10 +79,13 @@ func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context)
 func pollLoop(ctx context.Context, ch chan Event, interval time.Duration, fetch func(context.Context) (*InstanceMetadata, error)) {
 	defer close(ch)
 
-	old, err := fetch(ctx)
-	if err != nil {
+	// Initial fetch may fail (e.g. IMDS not ready on boot). Emit error
+	// and continue polling — don't kill the watch on a transient failure.
+	var old *InstanceMetadata
+	if m, err := fetch(ctx); err != nil {
 		send(ctx, ch, errorEvent(err))
-		return
+	} else {
+		old = m
 	}
 
 	ticker := time.NewTicker(interval)
@@ -129,8 +132,16 @@ var watchedFields = []dynamicField{
 // diffMetadata compares dynamic fields between two InstanceMetadata values.
 // Static fields (instance info) are never compared — they don't change on a running instance.
 func diffMetadata(old, new *InstanceMetadata) []string {
-	if old == nil || new == nil {
+	if new == nil {
 		return nil
+	}
+	if old == nil {
+		// First successful fetch — report all dynamic fields as changed.
+		var all []string
+		for _, f := range watchedFields {
+			all = append(all, f.name)
+		}
+		return all
 	}
 	var changed []string
 	for _, f := range watchedFields {
