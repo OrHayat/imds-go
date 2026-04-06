@@ -21,7 +21,11 @@ type MetadataError struct {
 }
 
 func (e *MetadataError) Error() string {
-	return fmt.Sprintf("imds %s: %s returned %d: %v", e.Provider, e.Path, e.StatusCode, e.Err)
+	msg := fmt.Sprintf("imds %s: %s returned %d", e.Provider, e.Path, e.StatusCode)
+	if e.Err != nil {
+		msg += ": " + e.Err.Error()
+	}
+	return msg
 }
 
 func (e *MetadataError) Unwrap() error {
