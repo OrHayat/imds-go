@@ -2,16 +2,14 @@ package imds
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"time"
 )
 
-const defaultPollInterval = 30 * time.Second
-
 // WatchConfig controls what is watched and how.
 type WatchConfig struct {
 	Interval time.Duration // polling interval, default 30s
+	Fields   []string      // top-level fields to watch, nil = all
 }
 
 // Event describes a metadata change or poll error.
@@ -24,127 +22,99 @@ type Event struct {
 	ErrMessage string            `json:"error,omitempty"`
 }
 
-func errorEvent(err error) Event {
-	return Event{
-		Timestamp:  time.Now(),
-		Err:        err,
-		ErrMessage: err.Error(),
-	}
-}
-
-func changeEvent(old, new *InstanceMetadata, changed []string) Event {
-	return Event{
-		Timestamp: time.Now(),
-		Old:       old,
-		New:       new,
-		Changed:   changed,
-	}
-}
-
-// send tries to send an event on ch. Drops the event if the buffer is full.
-// May return false if ctx is done, but this is best-effort — callers must
-// not rely on the return value to detect cancellation. The poll loop checks
-// ctx.Done() independently on each iteration.
-func send(ctx context.Context, ch chan<- Event, ev Event) bool {
-	select {
-	case ch <- ev:
-		return true
-	case <-ctx.Done():
-		return false
-	default:
-		return true // buffer full, drop event
-	}
-}
-
 // PollWatch is a shared poll-based watch helper.
 // Most providers delegate their Watch implementation to this function.
 // GCP overrides with long polling instead.
 func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context) (*InstanceMetadata, error)) (<-chan Event, error) {
 	interval := cfg.Interval
-	if interval < 0 {
-		return nil, fmt.Errorf("imds: invalid poll interval %v", interval)
-	}
 	if interval == 0 {
-		interval = defaultPollInterval
+		interval = 30 * time.Second
 	}
 
-	// Buffered to decouple poll rate from consumer speed.
-	// Events are dropped if the buffer is full (consumer too slow).
-	ch := make(chan Event, 32)
-	go pollLoop(ctx, ch, interval, fetch)
+	ch := make(chan Event)
+	go func() {
+		defer close(ch)
+
+		old, err := fetch(ctx)
+		if err != nil {
+			select {
+			case ch <- Event{Timestamp: time.Now(), Err: err, ErrMessage: err.Error()}:
+			case <-ctx.Done():
+			}
+			return
+		}
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cur, err := fetch(ctx)
+				if err != nil {
+					select {
+					case ch <- Event{Timestamp: time.Now(), Err: err, ErrMessage: err.Error()}:
+					case <-ctx.Done():
+						return
+					}
+					continue
+				}
+
+				changed := diffMetadata(old, cur, cfg.Fields)
+				if len(changed) > 0 {
+					select {
+					case ch <- Event{
+						Timestamp: time.Now(),
+						Old:       old,
+						New:       cur,
+						Changed:   changed,
+					}:
+					case <-ctx.Done():
+						return
+					}
+				}
+				old = cur
+			}
+		}
+	}()
+
 	return ch, nil
 }
 
-func pollLoop(ctx context.Context, ch chan Event, interval time.Duration, fetch func(context.Context) (*InstanceMetadata, error)) {
-	defer close(ch)
-
-	// Initial fetch may fail (e.g. IMDS not ready on boot). Emit error
-	// and continue polling — don't kill the watch on a transient failure.
-	var old *InstanceMetadata
-	if m, err := fetch(ctx); err != nil {
-		send(ctx, ch, errorEvent(err))
-	} else {
-		old = m
+// diffMetadata compares two InstanceMetadata values and returns which
+// top-level fields changed. If fields is non-nil, only those fields are checked.
+func diffMetadata(old, new *InstanceMetadata, fields []string) []string {
+	type fieldDef struct {
+		name string
+		get  func(*InstanceMetadata) any
 	}
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	allFields := []fieldDef{
+		{"instance", func(m *InstanceMetadata) any { return m.Instance }},
+		{"interfaces", func(m *InstanceMetadata) any { return m.Interfaces }},
+		{"tags", func(m *InstanceMetadata) any { return m.Tags }},
+		{"additional_properties", func(m *InstanceMetadata) any { return m.AdditionalProperties }},
+	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			old = pollOnce(ctx, ch, old, fetch)
+	check := allFields
+	if len(fields) > 0 {
+		filter := make(map[string]bool, len(fields))
+		for _, f := range fields {
+			filter[f] = true
+		}
+		check = nil
+		for _, f := range allFields {
+			if filter[f.name] {
+				check = append(check, f)
+			}
 		}
 	}
-}
 
-func pollOnce(ctx context.Context, ch chan<- Event, old *InstanceMetadata, fetch func(context.Context) (*InstanceMetadata, error)) *InstanceMetadata {
-	cur, err := fetch(ctx)
-	if err != nil {
-		send(ctx, ch, errorEvent(err))
-		return old
-	}
-
-	changed := diffMetadata(old, cur)
-	if len(changed) > 0 {
-		send(ctx, ch, changeEvent(old, cur, changed))
-	}
-	return cur
-}
-
-// dynamicField defines a field that can change on a running instance.
-type dynamicField struct {
-	name    string
-	changed func(old, new *InstanceMetadata) bool
-}
-
-var watchedFields = []dynamicField{
-	{"interfaces", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.Interfaces, n.Interfaces) }},
-	{"tags", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.Tags, n.Tags) }},
-	{"spot_terminating", func(o, n *InstanceMetadata) bool { return o.SpotTerminating != n.SpotTerminating }},
-	{"maintenance_events", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.MaintenanceEvents, n.MaintenanceEvents) }},
-	{"additional_properties", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.AdditionalProperties, n.AdditionalProperties) }},
-}
-
-// diffMetadata compares dynamic fields between two InstanceMetadata values.
-// Static fields (instance info) are never compared — they don't change on a running instance.
-func diffMetadata(old, new *InstanceMetadata) []string {
-	if new == nil {
-		return nil
-	}
-	if old == nil {
-		// First successful fetch — report all dynamic fields as changed.
-		var all []string
-		for _, f := range watchedFields {
-			all = append(all, f.name)
-		}
-		return all
-	}
 	var changed []string
-	for _, f := range watchedFields {
-		if f.changed(old, new) {
+	for _, f := range check {
+		if !reflect.DeepEqual(f.get(old), f.get(new)) {
 			changed = append(changed, f.name)
 		}
 	}
