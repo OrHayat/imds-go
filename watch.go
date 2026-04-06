@@ -2,6 +2,7 @@ package imds
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"time"
 )
@@ -58,7 +59,10 @@ func send(ctx context.Context, ch chan<- Event, ev Event) bool {
 // GCP overrides with long polling instead.
 func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context) (*InstanceMetadata, error)) (<-chan Event, error) {
 	interval := cfg.Interval
-	if interval <= 0 {
+	if interval < 0 {
+		return nil, fmt.Errorf("imds: invalid poll interval %v", interval)
+	}
+	if interval == 0 {
 		interval = defaultPollInterval
 	}
 
