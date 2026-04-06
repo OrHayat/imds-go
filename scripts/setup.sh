@@ -4,20 +4,8 @@ set -euo pipefail
 GO_MIN_VERSION="1.26"
 GIT_TOWN_MIN_VERSION="22.0"
 
-compare_version() {
-    local current="$1" minimum="$2"
-    local cur_major cur_minor min_major min_minor
-    cur_major="${current%%.*}"
-    cur_minor="${current#*.}"
-    min_major="${minimum%%.*}"
-    min_minor="${minimum#*.}"
-    if [ "$cur_major" -gt "$min_major" ] 2>/dev/null; then return 0; fi
-    if [ "$cur_major" -eq "$min_major" ] && [ "$cur_minor" -ge "$min_minor" ] 2>/dev/null; then return 0; fi
-    return 1
-}
-
-extract_version() {
-    echo "$1" | sed -E 's/.*([0-9]+\.[0-9]+).*/\1/' | head -1
+version_ge() {
+    [ "$(printf '%s\n%s' "$1" "$2" | sort -t. -k1,1n -k2,2n | head -1)" = "$2" ]
 }
 
 detect_os() {
@@ -39,8 +27,8 @@ detect_arch() {
 install_go() {
     if command -v go &>/dev/null; then
         local version
-        version=$(extract_version "$(go version)")
-        if compare_version "$version" "$GO_MIN_VERSION"; then
+        version=$(go version | awk '{print $3}' | tr -d 'go' | cut -d. -f1,2)
+        if version_ge "$version" "$GO_MIN_VERSION"; then
             echo -e "\e[32m[OK]\e[0m Go $version"
             return
         fi
@@ -73,8 +61,8 @@ install_go() {
 install_git_town() {
     if command -v git-town &>/dev/null; then
         local version
-        version=$(extract_version "$(git-town --version 2>&1)")
-        if compare_version "$version" "$GIT_TOWN_MIN_VERSION"; then
+        version=$(git-town --version 2>&1 | awk '{print $NF}' | cut -d. -f1,2)
+        if version_ge "$version" "$GIT_TOWN_MIN_VERSION"; then
             echo -e "\e[32m[OK]\e[0m git-town $version"
             return
         fi
