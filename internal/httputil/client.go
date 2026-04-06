@@ -1,7 +1,6 @@
 package httputil
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net"
@@ -11,14 +10,15 @@ import (
 
 const defaultTimeout = 2 * time.Second
 
-// Client wraps http.Client with IMDS-specific defaults and retry logic.
+// Client wraps http.Client with IMDS-specific defaults.
+// Retry logic is controlled by the Retryer.
 type Client struct {
 	http    *http.Client
 	retryer Retryer
 }
 
 // DefaultClient creates an HTTP client with IMDS defaults:
-// link-local transport, 2s timeout, 3 retries.
+// link-local transport, 2s timeout, default retryer.
 func DefaultClient() *Client {
 	return &Client{
 		http: &http.Client{
@@ -50,31 +50,24 @@ func NewClient(httpClient *http.Client, retryer Retryer) *Client {
 }
 
 // Do executes an HTTP request with retries controlled by the Retryer.
-func (c *Client) Do(ctx context.Context, method, url string, headers map[string]string) (*http.Response, error) {
+// The caller builds the request; the client handles execution and retries.
+func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	var lastErr error
 	for attempt := range c.retryer.MaxAttempts() {
-		req, err := http.NewRequestWithContext(ctx, method, url, nil)
-		if err != nil {
-			return nil, err
-		}
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
-
 		resp, err := c.http.Do(req)
 		if err != nil {
 			lastErr = err
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
+			if req.Context().Err() != nil {
+				return nil, req.Context().Err()
 			}
-			waitBackoff(ctx, c.retryer.BackoffDelay(attempt))
+			waitBackoff(req.Context(), c.retryer.BackoffDelay(attempt))
 			continue
 		}
 
 		if c.retryer.IsRetryable(resp.StatusCode) {
 			resp.Body.Close()
-			lastErr = fmt.Errorf("http %d from %s %s", resp.StatusCode, method, url)
-			waitBackoff(ctx, c.retryer.BackoffDelay(attempt))
+			lastErr = fmt.Errorf("http %d from %s %s", resp.StatusCode, req.Method, req.URL)
+			waitBackoff(req.Context(), c.retryer.BackoffDelay(attempt))
 			continue
 		}
 
