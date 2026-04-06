@@ -6,4 +6,8 @@
 main = "master"
 
 [hosting]
-github-connector = "api"
+github-connector = "gh"
+browser = "(none)"
+
+[sync]
+feature-strategy = "rebase"
