@@ -48,6 +48,7 @@ func DetectPriority(ctx context.Context, groups ...ProbeGroup) (Provider, error)
 
 type probeResult struct {
 	provider Provider
+	ok       bool
 	err      error
 }
 
@@ -63,7 +64,7 @@ func probeAll(ctx context.Context, providers []Provider) (Provider, []error) {
 		go func(p Provider) {
 			defer wg.Done()
 			ok, err := p.Probe(ctx)
-			results <- probeResult{provider: p, err: err}
+			results <- probeResult{provider: p, ok: ok, err: err}
 			if ok && err == nil {
 				cancel()
 			}
@@ -80,7 +81,7 @@ func probeAll(ctx context.Context, providers []Provider) (Provider, []error) {
 	for r := range results {
 		if r.err != nil {
 			errs = append(errs, r.err)
-		} else if matched == nil {
+		} else if r.ok && matched == nil {
 			matched = r.provider
 		}
 	}
