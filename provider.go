@@ -24,9 +24,15 @@ type Provider interface {
 	Watch(ctx context.Context, cfg WatchConfig) (<-chan Event, error)
 }
 
-// ProbeTarget is implemented by both Provider (priority 0) and ProbeGroup (explicit priority).
-// Used by Detect to support both simple and priority-based detection.
-type ProbeTarget interface {
-	probeProviders() []Provider
-	probePriority() int
+// ProbeGroup holds providers with an explicit priority level.
+// Used by DetectPriority for priority-based detection.
+type ProbeGroup struct {
+	level     int
+	providers []Provider
+}
+
+// Priority creates a probe group with the given priority level.
+// Lower numbers run first. Providers within a group run concurrently.
+func Priority(level int, providers ...Provider) ProbeGroup {
+	return ProbeGroup{level: level, providers: providers}
 }
