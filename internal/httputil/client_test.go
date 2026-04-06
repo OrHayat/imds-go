@@ -36,7 +36,7 @@ func TestDo_Success(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	resp, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestDo_SetsHeaders(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"}))
+	_, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestDo_RetriesOn5xx(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	resp, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestDo_RetriesOn429(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	resp, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestDo_MaxRetriesExceeded(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	_, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -130,7 +130,7 @@ func TestDo_ContextCancelled(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 
 	c := testClient(t, srv)
@@ -157,7 +157,7 @@ func TestDo_MaxRetriesExceeded_ErrorTypes(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	_, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
 
 	var retryErr *RetryError
 	if !errors.As(err, &retryErr) {
@@ -185,7 +185,7 @@ func TestDo_RetryWithBody(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPut, srv.URL, strings.NewReader("hello"))
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL, strings.NewReader("hello"))
 	req.GetBody = func() (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader("hello")), nil
 	}
