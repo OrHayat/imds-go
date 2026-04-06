@@ -48,7 +48,7 @@ install_go() {
         exit 1
     fi
     local tmpfile
-    tmpfile=$(mktemp /tmp/go-XXXXXX.tar.gz)
+    tmpfile=$(mktemp /tmp/go-XXXXXX)
     curl -sL "https://go.dev/dl/${latest}.${os}-${arch}.tar.gz" -o "$tmpfile"
     echo "This will replace /usr/local/go"
     sudo rm -rf /usr/local/go
