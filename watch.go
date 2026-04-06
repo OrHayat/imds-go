@@ -45,10 +45,13 @@ func changeEvent(old, new *InstanceMetadata, changed []string) Event {
 // Returns false if ctx is done.
 func send(ctx context.Context, ch chan<- Event, ev Event) bool {
 	select {
-	case ch <- ev:
-		return true
 	case <-ctx.Done():
 		return false
+	default:
+	}
+	select {
+	case ch <- ev:
+		return true
 	default:
 		return true // buffer full, drop event
 	}
