@@ -8,3 +8,6 @@ main = "master"
 [hosting]
 github-connector = "gh"
 browser = "(none)"
+
+[sync]
+feature-strategy = "rebase"
