@@ -105,37 +105,30 @@ func pollOnce(ctx context.Context, ch chan<- Event, old *InstanceMetadata, field
 // diffMetadata compares two InstanceMetadata values and returns which
 // top-level fields changed. If fields is non-nil, only those fields are checked.
 func diffMetadata(old, new *InstanceMetadata, fields []string) []string {
-	type field struct {
-		name string
-		get  func(*InstanceMetadata) any
-	}
-
-	all := []field{
-		{"instance", func(m *InstanceMetadata) any { return m.Instance }},
-		{"interfaces", func(m *InstanceMetadata) any { return m.Interfaces }},
-		{"tags", func(m *InstanceMetadata) any { return m.Tags }},
-		{"additional_properties", func(m *InstanceMetadata) any { return m.AdditionalProperties }},
-	}
-
-	toCheck := all
-	if len(fields) > 0 {
-		filter := make(map[string]bool, len(fields))
-		for _, f := range fields {
-			filter[f] = true
+	watching := func(name string) bool {
+		if len(fields) == 0 {
+			return true
 		}
-		toCheck = nil
-		for _, f := range all {
-			if filter[f.name] {
-				toCheck = append(toCheck, f)
+		for _, f := range fields {
+			if f == name {
+				return true
 			}
 		}
+		return false
 	}
 
 	var changed []string
-	for _, f := range toCheck {
-		if !reflect.DeepEqual(f.get(old), f.get(new)) {
-			changed = append(changed, f.name)
-		}
+	if watching("instance") && !reflect.DeepEqual(old.Instance, new.Instance) {
+		changed = append(changed, "instance")
+	}
+	if watching("interfaces") && !reflect.DeepEqual(old.Interfaces, new.Interfaces) {
+		changed = append(changed, "interfaces")
+	}
+	if watching("tags") && !reflect.DeepEqual(old.Tags, new.Tags) {
+		changed = append(changed, "tags")
+	}
+	if watching("additional_properties") && !reflect.DeepEqual(old.AdditionalProperties, new.AdditionalProperties) {
+		changed = append(changed, "additional_properties")
 	}
 	return changed
 }
