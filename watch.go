@@ -111,6 +111,12 @@ func diffMetadata(old, new *InstanceMetadata) []string {
 	if !reflect.DeepEqual(old.Tags, new.Tags) {
 		changed = append(changed, "tags")
 	}
+	if old.SpotTerminating != new.SpotTerminating {
+		changed = append(changed, "spot_terminating")
+	}
+	if !reflect.DeepEqual(old.MaintenanceEvents, new.MaintenanceEvents) {
+		changed = append(changed, "maintenance_events")
+	}
 	if !reflect.DeepEqual(old.AdditionalProperties, new.AdditionalProperties) {
 		changed = append(changed, "additional_properties")
 	}
