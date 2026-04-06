@@ -121,7 +121,7 @@ func TestPollOnce_EmitsChangeEvent(t *testing.T) {
 	fetch := func(ctx context.Context) (*InstanceMetadata, error) { return cur, nil }
 
 	ch := make(chan Event, 1)
-	got := pollOnce(context.Background(), ch, old, fetch)
+	got := pollOnce(t.Context(), ch, old, fetch)
 
 	if got != cur {
 		t.Fatal("expected pollOnce to return new metadata")
@@ -139,7 +139,7 @@ func TestPollOnce_NoChangeNoEvent(t *testing.T) {
 	}
 
 	ch := make(chan Event, 1)
-	got := pollOnce(context.Background(), ch, m, fetch)
+	got := pollOnce(t.Context(), ch, m, fetch)
 
 	if got == m {
 		t.Fatal("expected new metadata pointer even without changes")
@@ -156,7 +156,7 @@ func TestPollOnce_FetchError(t *testing.T) {
 	}
 
 	ch := make(chan Event, 1)
-	got := pollOnce(context.Background(), ch, old, fetch)
+	got := pollOnce(t.Context(), ch, old, fetch)
 
 	if got != old {
 		t.Fatal("expected old metadata returned on error")
@@ -177,7 +177,7 @@ func TestPollWatch_EmitsChange(t *testing.T) {
 		return &InstanceMetadata{Tags: map[string]string{"v": "2"}}, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 
 	ch, err := PollWatch(ctx, WatchConfig{Interval: 50 * time.Millisecond}, fetch)
@@ -204,7 +204,7 @@ func TestPollWatch_EmitsErrorEvent(t *testing.T) {
 		return nil, errors.New("imds down")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
 	defer cancel()
 
 	ch, err := PollWatch(ctx, WatchConfig{Interval: 50 * time.Millisecond}, fetch)
@@ -226,7 +226,7 @@ func TestPollWatch_ClosesOnCancel(t *testing.T) {
 		return &InstanceMetadata{}, nil
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	ch, err := PollWatch(ctx, WatchConfig{Interval: 50 * time.Millisecond}, fetch)
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ func TestPollWatch_ClosesOnCancel(t *testing.T) {
 
 func TestPollWatch_NegativeInterval(t *testing.T) {
 	fetch := func(ctx context.Context) (*InstanceMetadata, error) { return nil, nil }
-	_, err := PollWatch(context.Background(), WatchConfig{Interval: -1 * time.Second}, fetch)
+	_, err := PollWatch(t.Context(), WatchConfig{Interval: -1 * time.Second}, fetch)
 	if err == nil {
 		t.Fatal("expected error on negative interval")
 	}
@@ -252,7 +252,7 @@ func TestSend_BufferFullDrops(t *testing.T) {
 	ch := make(chan Event, 1)
 	ch <- Event{} // fill buffer
 
-	ok := send(context.Background(), ch, Event{ErrMessage: "dropped"})
+	ok := send(t.Context(), ch, Event{ErrMessage: "dropped"})
 	if !ok {
 		t.Fatal("expected true (drop), got false")
 	}
@@ -264,7 +264,7 @@ func TestSend_BufferFullDrops(t *testing.T) {
 }
 
 func TestSend_CtxCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	ch := make(chan Event) // unbuffered, nobody reading
