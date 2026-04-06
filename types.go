@@ -1,12 +1,23 @@
 package imds
 
+import "time"
+
 // InstanceMetadata is the normalized, cross-provider metadata struct.
 type InstanceMetadata struct {
 	Provider             ID                  `json:"provider"`
 	Instance             InstanceInfo        `json:"instance"`
 	Interfaces           []NetworkInterface  `json:"interfaces"`
 	Tags                 map[string]string   `json:"tags,omitempty"`
+	SpotTerminating      bool                `json:"spot_terminating,omitempty"`
+	MaintenanceEvents    []MaintenanceEvent  `json:"maintenance_events,omitempty"`
 	AdditionalProperties map[string]any      `json:"additional_properties,omitempty"`
+}
+
+// MaintenanceEvent describes a scheduled maintenance action.
+type MaintenanceEvent struct {
+	Type   string    `json:"type"`   // "reboot", "terminate", "migrate"
+	Status string    `json:"status"` // "scheduled", "started"
+	Before time.Time `json:"before"` // deadline
 }
 
 // InstanceInfo holds compute instance details.
