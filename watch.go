@@ -40,7 +40,7 @@ func changeEvent(old, new *InstanceMetadata, changed []string) Event {
 	}
 }
 
-// send sends an event on ch, respecting context cancellation.
+// send sends an event on ch. Drops the event if the buffer is full.
 // Returns false if ctx is done.
 func send(ctx context.Context, ch chan<- Event, ev Event) bool {
 	select {
@@ -48,6 +48,8 @@ func send(ctx context.Context, ch chan<- Event, ev Event) bool {
 		return true
 	case <-ctx.Done():
 		return false
+	default:
+		return true // buffer full, drop event
 	}
 }
 
@@ -60,7 +62,7 @@ func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context)
 		interval = defaultPollInterval
 	}
 
-	ch := make(chan Event)
+	ch := make(chan Event, 32)
 	go pollLoop(ctx, ch, interval, fetch)
 	return ch, nil
 }
