@@ -1,31 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-GO_MIN_VERSION="1.22"
+GO_MIN_VERSION="1.26"
 GIT_TOWN_MIN_VERSION="22.0"
 
 compare_version() {
     local current="$1" minimum="$2"
-    printf '%s\n%s' "$minimum" "$current" | sort -V -C
+    local cur_major cur_minor min_major min_minor
+    cur_major="${current%%.*}"
+    cur_minor="${current#*.}"
+    min_major="${minimum%%.*}"
+    min_minor="${minimum#*.}"
+    if [ "$cur_major" -gt "$min_major" ] 2>/dev/null; then return 0; fi
+    if [ "$cur_major" -eq "$min_major" ] && [ "$cur_minor" -ge "$min_minor" ] 2>/dev/null; then return 0; fi
+    return 1
 }
 
 extract_version() {
-    echo "$1" | sed -n 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p' | head -1
+    echo "$1" | sed -E 's/.*([0-9]+\.[0-9]+).*/\1/' | head -1
 }
 
 detect_os() {
     case "$(uname -s)" in
         Linux)  echo "linux" ;;
         Darwin) echo "darwin" ;;
-        *)      echo "linux" ;;
+        *)      echo -e "\e[31m[ERROR]\e[0m Unsupported OS: $(uname -s)" >&2; exit 1 ;;
     esac
 }
 
 detect_arch() {
     case "$(uname -m)" in
-        x86_64)  echo "amd64" ;;
+        x86_64)       echo "amd64" ;;
         aarch64|arm64) echo "arm64" ;;
-        *)       echo "amd64" ;;
+        *)            echo -e "\e[31m[ERROR]\e[0m Unsupported arch: $(uname -m)" >&2; exit 1 ;;
     esac
 }
 
@@ -48,10 +55,17 @@ install_go() {
     arch=$(detect_arch)
     local latest
     latest=$(curl -sL 'https://go.dev/VERSION?m=text' | head -1)
-    curl -sL "https://go.dev/dl/${latest}.${os}-${arch}.tar.gz" -o /tmp/go.tar.gz
+    if ! echo "$latest" | grep -qE '^go[0-9]+\.'; then
+        echo -e "\e[31m[ERROR]\e[0m Failed to determine latest Go version"
+        exit 1
+    fi
+    local tmpfile
+    tmpfile=$(mktemp /tmp/go-XXXXXX.tar.gz)
+    curl -sL "https://go.dev/dl/${latest}.${os}-${arch}.tar.gz" -o "$tmpfile"
+    echo "This will replace /usr/local/go"
     sudo rm -rf /usr/local/go
-    sudo tar -C /usr/local -xzf /tmp/go.tar.gz
-    rm /tmp/go.tar.gz
+    sudo tar -C /usr/local -xzf "$tmpfile"
+    rm -f "$tmpfile"
     export PATH="/usr/local/go/bin:$PATH"
     echo -e "\e[32m[OK]\e[0m Go installed. Add /usr/local/go/bin to your PATH if not already."
 }

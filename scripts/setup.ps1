@@ -2,7 +2,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$GO_MIN_VERSION = "1.22"
+$GO_MIN_VERSION = "1.26"
 $GIT_TOWN_MIN_VERSION = "22.0"
 
 function Compare-Version {
@@ -30,7 +30,11 @@ function Install-Go {
         Write-Host "[ERROR] Failed to install Go. Install manually from https://go.dev/dl/" -ForegroundColor Red
         exit 1
     }
-    Write-Host "[OK] Go installed. Restart your terminal to update PATH." -ForegroundColor Green
+    $goPath = [Environment]::GetEnvironmentVariable("PATH", "Machine") -split ";" | Where-Object { $_ -like "*Go*bin*" }
+    if ($goPath) {
+        $env:PATH = "$env:PATH;$goPath"
+    }
+    Write-Host "[OK] Go installed" -ForegroundColor Green
 }
 
 function Install-GitTown {
