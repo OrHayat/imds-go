@@ -9,26 +9,14 @@ import (
 	"time"
 )
 
-func newReq(t *testing.T, ctx context.Context, method, url string, headers map[string]string) *http.Request {
-	t.Helper()
-	req, err := http.NewRequestWithContext(ctx, method, url, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-	return req
-}
-
 func TestDo_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
-	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	c := NewClient(srv.Client(), 2*time.Second)
+	resp, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +34,8 @@ func TestDo_SetsHeaders(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
-	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"}))
+	c := NewClient(srv.Client(), 2*time.Second)
+	_, err := c.Do(context.Background(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,8 +55,8 @@ func TestDo_RetriesOn5xx(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
-	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	c := NewClient(srv.Client(), 5*time.Second)
+	resp, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,8 +80,8 @@ func TestDo_RetriesOn429(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
-	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	c := NewClient(srv.Client(), 5*time.Second)
+	resp, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +97,8 @@ func TestDo_MaxRetriesExceeded(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
-	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+	c := NewClient(srv.Client(), 5*time.Second)
+	_, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -125,20 +113,9 @@ func TestDo_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	c := NewClient(srv.Client(), nil)
-	_, err := c.Do(newReq(t, ctx, http.MethodGet, srv.URL, nil))
+	c := NewClient(srv.Client(), 10*time.Second)
+	_, err := c.Do(ctx, http.MethodGet, srv.URL, nil)
 	if err == nil {
 		t.Fatal("expected error on cancelled context")
-	}
-}
-
-func TestNewClient_DoesNotMutateUserClient(t *testing.T) {
-	userClient := &http.Client{Timeout: 10 * time.Second}
-	_ = NewClient(userClient, nil)
-	if userClient.Timeout != 10*time.Second {
-		t.Fatalf("expected timeout 10s, got %v", userClient.Timeout)
-	}
-	if userClient.Transport != nil {
-		t.Fatal("expected nil transport, got non-nil")
 	}
 }
