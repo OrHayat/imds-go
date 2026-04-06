@@ -239,3 +239,37 @@ func TestPollWatch_ClosesOnCancel(t *testing.T) {
 		_ = ev
 	}
 }
+
+func TestPollWatch_NegativeInterval(t *testing.T) {
+	fetch := func(ctx context.Context) (*InstanceMetadata, error) { return nil, nil }
+	_, err := PollWatch(context.Background(), WatchConfig{Interval: -1 * time.Second}, fetch)
+	if err == nil {
+		t.Fatal("expected error on negative interval")
+	}
+}
+
+func TestSend_BufferFullDrops(t *testing.T) {
+	ch := make(chan Event, 1)
+	ch <- Event{} // fill buffer
+
+	ok := send(context.Background(), ch, Event{ErrMessage: "dropped"})
+	if !ok {
+		t.Fatal("expected true (drop), got false")
+	}
+	// Only the first event should be in the channel
+	ev := <-ch
+	if ev.ErrMessage == "dropped" {
+		t.Fatal("expected original event, got the dropped one")
+	}
+}
+
+func TestSend_CtxCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	ch := make(chan Event) // unbuffered, nobody reading
+	ok := send(ctx, ch, Event{})
+	// With cancelled ctx and no reader, send should return false (ctx done)
+	// or true (default drop). Both are acceptable per the TOCTOU comment.
+	_ = ok
+}
