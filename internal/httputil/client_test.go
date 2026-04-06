@@ -2,8 +2,11 @@ package httputil
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -144,5 +147,54 @@ func TestDefaultHTTPClient(t *testing.T) {
 	}
 	if c.Timeout != defaultTimeout {
 		t.Fatalf("expected timeout %v, got %v", defaultTimeout, c.Timeout)
+	}
+}
+
+func TestDo_MaxRetriesExceeded_ErrorTypes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(503)
+	}))
+	defer srv.Close()
+
+	c := testClient(t, srv)
+	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
+
+	var retryErr *RetryError
+	if !errors.As(err, &retryErr) {
+		t.Fatalf("expected RetryError, got %T: %v", err, err)
+	}
+	var statusErr *StatusError
+	if !errors.As(retryErr.Err, &statusErr) {
+		t.Fatalf("expected StatusError inside RetryError, got %T: %v", retryErr.Err, retryErr.Err)
+	}
+	if statusErr.Code != 503 {
+		t.Fatalf("expected status 503, got %d", statusErr.Code)
+	}
+}
+
+func TestDo_RetryWithBody(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if calls.Add(1) < 2 {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write(body)
+	}))
+	defer srv.Close()
+
+	c := testClient(t, srv)
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPut, srv.URL, strings.NewReader("hello"))
+	req.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("hello")), nil
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := ReadBody(resp)
+	if string(body) != "hello" {
+		t.Fatalf("expected 'hello', got %q", body)
 	}
 }

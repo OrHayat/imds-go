@@ -35,46 +35,6 @@ func NewHTTPClient(base http.RoundTripper, retryer Retryer) *http.Client {
 	}
 }
 
-// retryTransport wraps an http.RoundTripper with retry logic.
-type retryTransport struct {
-	base    http.RoundTripper
-	retryer Retryer
-}
-
-func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	var lastErr error
-	for attempt := range t.retryer.MaxAttempts() {
-		// Reset body for retries (consumed after first attempt).
-		if attempt > 0 && req.GetBody != nil {
-			body, err := req.GetBody()
-			if err != nil {
-				return nil, err
-			}
-			req.Body = body
-		}
-
-		resp, err := t.base.RoundTrip(req)
-		if err != nil {
-			lastErr = err
-			if req.Context().Err() != nil {
-				return nil, req.Context().Err()
-			}
-			waitBackoff(req.Context(), t.retryer.BackoffDelay(attempt))
-			continue
-		}
-
-		if t.retryer.IsRetryable(resp.StatusCode) {
-			resp.Body.Close()
-			lastErr = &StatusError{Code: resp.StatusCode, Method: req.Method, URL: req.URL.String()}
-			waitBackoff(req.Context(), t.retryer.BackoffDelay(attempt))
-			continue
-		}
-
-		return resp, nil
-	}
-	return nil, &RetryError{Err: lastErr}
-}
-
 // ReadBody reads and closes the response body.
 func ReadBody(resp *http.Response) ([]byte, error) {
 	defer resp.Body.Close()
