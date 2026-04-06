@@ -13,10 +13,18 @@ extract_version() {
     echo "$1" | sed -n 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p' | head -1
 }
 
+detect_os() {
+    case "$(uname -s)" in
+        Linux)  echo "linux" ;;
+        Darwin) echo "darwin" ;;
+        *)      echo "linux" ;;
+    esac
+}
+
 detect_arch() {
     case "$(uname -m)" in
         x86_64)  echo "amd64" ;;
-        aarch64) echo "arm64" ;;
+        aarch64|arm64) echo "arm64" ;;
         *)       echo "amd64" ;;
     esac
 }
@@ -35,11 +43,12 @@ install_go() {
     fi
 
     echo "Installing Go from go.dev..."
-    local arch
+    local os arch
+    os=$(detect_os)
     arch=$(detect_arch)
     local latest
     latest=$(curl -sL 'https://go.dev/VERSION?m=text' | head -1)
-    curl -sL "https://go.dev/dl/${latest}.linux-${arch}.tar.gz" -o /tmp/go.tar.gz
+    curl -sL "https://go.dev/dl/${latest}.${os}-${arch}.tar.gz" -o /tmp/go.tar.gz
     sudo rm -rf /usr/local/go
     sudo tar -C /usr/local -xzf /tmp/go.tar.gz
     rm /tmp/go.tar.gz
@@ -65,7 +74,7 @@ install_git_town() {
     echo -e "\e[32m[OK]\e[0m git-town installed"
 }
 
-echo "=== imds-go dev setup (Linux) ==="
+echo "=== imds-go dev setup ($(uname -s)) ==="
 echo ""
 install_go
 install_git_town
