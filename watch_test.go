@@ -83,6 +83,29 @@ func TestDiffMetadata_MultipleChanges(t *testing.T) {
 	}
 }
 
+func TestDiffMetadata_NilOld(t *testing.T) {
+	new := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
+	changed := diffMetadata(nil, new)
+	if len(changed) != len(watchedFields) {
+		t.Fatalf("expected all %d fields, got %v", len(watchedFields), changed)
+	}
+}
+
+func TestDiffMetadata_NilNew(t *testing.T) {
+	old := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
+	changed := diffMetadata(old, nil)
+	if len(changed) != 0 {
+		t.Fatalf("expected no changes on nil new, got %v", changed)
+	}
+}
+
+func TestDiffMetadata_BothNil(t *testing.T) {
+	changed := diffMetadata(nil, nil)
+	if len(changed) != 0 {
+		t.Fatalf("expected no changes on both nil, got %v", changed)
+	}
+}
+
 func TestDiffMetadata_StaticFieldsIgnored(t *testing.T) {
 	old := &InstanceMetadata{Instance: InstanceInfo{ID: "i-111", Hostname: "a"}}
 	new := &InstanceMetadata{Instance: InstanceInfo{ID: "i-222", Hostname: "b"}}
