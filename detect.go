@@ -47,11 +47,14 @@ func DetectPriority(ctx context.Context, groups ...ProbeGroup) (Provider, error)
 }
 
 type probeResult struct {
+	index    int
 	provider Provider
 	ok       bool
 	err      error
 }
 
+// probeAll runs all providers concurrently. If multiple match,
+// the one earliest in the input slice wins (deterministic).
 func probeAll(ctx context.Context, providers []Provider) (Provider, []error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -59,16 +62,16 @@ func probeAll(ctx context.Context, providers []Provider) (Provider, []error) {
 	results := make(chan probeResult, len(providers))
 	var wg sync.WaitGroup
 
-	for _, p := range providers {
+	for i, p := range providers {
 		wg.Add(1)
-		go func(p Provider) {
+		go func(i int, p Provider) {
 			defer wg.Done()
 			ok, err := p.Probe(ctx)
-			results <- probeResult{provider: p, ok: ok, err: err}
+			results <- probeResult{index: i, provider: p, ok: ok, err: err}
 			if ok && err == nil {
 				cancel()
 			}
-		}(p)
+		}(i, p)
 	}
 
 	go func() {
@@ -76,13 +79,15 @@ func probeAll(ctx context.Context, providers []Provider) (Provider, []error) {
 		close(results)
 	}()
 
+	matchedIdx := -1
 	var matched Provider
 	var errs []error
 	for r := range results {
 		if r.err != nil {
 			errs = append(errs, r.err)
-		} else if r.ok && matched == nil {
+		} else if r.ok && (matched == nil || r.index < matchedIdx) {
 			matched = r.provider
+			matchedIdx = r.index
 		}
 	}
 	return matched, errs
