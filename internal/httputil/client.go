@@ -44,6 +44,15 @@ type retryTransport struct {
 func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var lastErr error
 	for attempt := range t.retryer.MaxAttempts() {
+		// Reset body for retries (consumed after first attempt).
+		if attempt > 0 && req.GetBody != nil {
+			body, err := req.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			req.Body = body
+		}
+
 		resp, err := t.base.RoundTrip(req)
 		if err != nil {
 			lastErr = err
