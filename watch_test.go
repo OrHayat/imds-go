@@ -92,6 +92,58 @@ func TestDiffMetadata_StaticFieldsIgnored(t *testing.T) {
 	}
 }
 
+func TestPollOnce_EmitsChangeEvent(t *testing.T) {
+	old := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
+	cur := &InstanceMetadata{Tags: map[string]string{"v": "2"}}
+	fetch := func(ctx context.Context) (*InstanceMetadata, error) { return cur, nil }
+
+	ch := make(chan Event, 1)
+	got := pollOnce(context.Background(), ch, old, fetch)
+
+	if got != cur {
+		t.Fatal("expected pollOnce to return new metadata")
+	}
+	ev := <-ch
+	if len(ev.Changed) != 1 || ev.Changed[0] != "tags" {
+		t.Fatalf("expected [tags], got %v", ev.Changed)
+	}
+}
+
+func TestPollOnce_NoChangeNoEvent(t *testing.T) {
+	m := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
+	fetch := func(ctx context.Context) (*InstanceMetadata, error) {
+		return &InstanceMetadata{Tags: map[string]string{"v": "1"}}, nil
+	}
+
+	ch := make(chan Event, 1)
+	got := pollOnce(context.Background(), ch, m, fetch)
+
+	if got == m {
+		t.Fatal("expected new metadata pointer even without changes")
+	}
+	if len(ch) != 0 {
+		t.Fatal("expected no event on unchanged metadata")
+	}
+}
+
+func TestPollOnce_FetchError(t *testing.T) {
+	old := &InstanceMetadata{}
+	fetch := func(ctx context.Context) (*InstanceMetadata, error) {
+		return nil, errors.New("timeout")
+	}
+
+	ch := make(chan Event, 1)
+	got := pollOnce(context.Background(), ch, old, fetch)
+
+	if got != old {
+		t.Fatal("expected old metadata returned on error")
+	}
+	ev := <-ch
+	if ev.Err == nil || ev.ErrMessage != "timeout" {
+		t.Fatalf("expected error event, got %v", ev)
+	}
+}
+
 func TestPollWatch_EmitsChange(t *testing.T) {
 	call := 0
 	fetch := func(ctx context.Context) (*InstanceMetadata, error) {
