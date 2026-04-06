@@ -10,11 +10,28 @@ import (
 	"time"
 )
 
+const (
+	defaultTimeout    = 2 * time.Second
+	defaultMaxRetries = 3
+)
+
 // Client wraps http.Client with IMDS-specific defaults: link-local dialer,
 // short timeout, and retry with exponential backoff.
 type Client struct {
-	http    *http.Client
+	http       *http.Client
 	maxRetries int
+}
+
+// DefaultClient creates an HTTP client with IMDS defaults:
+// link-local transport, 2s timeout, 3 retries.
+func DefaultClient() *Client {
+	return &Client{
+		http: &http.Client{
+			Timeout:   defaultTimeout,
+			Transport: newIMDSTransport(),
+		},
+		maxRetries: defaultMaxRetries,
+	}
 }
 
 // NewClient creates an HTTP client suitable for IMDS requests.
@@ -22,21 +39,23 @@ type Client struct {
 // Timeout applies to individual requests (default 2s).
 func NewClient(httpClient *http.Client, timeout time.Duration) *Client {
 	if timeout == 0 {
-		timeout = 2 * time.Second
+		timeout = defaultTimeout
 	}
 	if httpClient == nil {
-		httpClient = &http.Client{
-			Timeout:   timeout,
-			Transport: newIMDSTransport(),
+		return &Client{
+			http: &http.Client{
+				Timeout:   timeout,
+				Transport: newIMDSTransport(),
+			},
+			maxRetries: defaultMaxRetries,
 		}
-	} else {
-		if httpClient.Timeout == 0 {
-			httpClient.Timeout = timeout
-		}
+	}
+	if httpClient.Timeout == 0 {
+		httpClient.Timeout = timeout
 	}
 	return &Client{
 		http:       httpClient,
-		maxRetries: 3,
+		maxRetries: defaultMaxRetries,
 	}
 }
 
