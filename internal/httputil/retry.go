@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 )
@@ -31,6 +32,30 @@ func (r DefaultRetryer) BackoffDelay(attempt int) time.Duration {
 
 func (r DefaultRetryer) IsRetryable(statusCode int) bool {
 	return statusCode == 429 || statusCode >= 500
+}
+
+// StatusError is returned when a retryable HTTP status exhausts all attempts.
+type StatusError struct {
+	Code   int
+	Method string
+	URL    string
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("http %d from %s %s", e.Code, e.Method, e.URL)
+}
+
+// RetryError is returned when all retry attempts are exhausted.
+type RetryError struct {
+	Err error
+}
+
+func (e *RetryError) Error() string {
+	return fmt.Sprintf("max retries exceeded: %v", e.Err)
+}
+
+func (e *RetryError) Unwrap() error {
+	return e.Err
 }
 
 // waitBackoff sleeps for the given duration, respecting context cancellation.

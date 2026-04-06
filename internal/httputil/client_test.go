@@ -9,6 +9,11 @@ import (
 	"time"
 )
 
+func testClient(t *testing.T, srv *httptest.Server) *http.Client {
+	t.Helper()
+	return NewHTTPClient(srv.Client().Transport, nil)
+}
+
 func newReq(t *testing.T, ctx context.Context, method, url string, headers map[string]string) *http.Request {
 	t.Helper()
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
@@ -27,7 +32,7 @@ func TestDo_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
+	c := testClient(t, srv)
 	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +51,7 @@ func TestDo_SetsHeaders(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
+	c := testClient(t, srv)
 	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"}))
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +72,7 @@ func TestDo_RetriesOn5xx(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
+	c := testClient(t, srv)
 	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +97,7 @@ func TestDo_RetriesOn429(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
+	c := testClient(t, srv)
 	resp, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
 	if err != nil {
 		t.Fatal(err)
@@ -109,7 +114,7 @@ func TestDo_MaxRetriesExceeded(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient(srv.Client(), nil)
+	c := testClient(t, srv)
 	_, err := c.Do(newReq(t, context.Background(), http.MethodGet, srv.URL, nil))
 	if err == nil {
 		t.Fatal("expected error")
@@ -125,20 +130,19 @@ func TestDo_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	c := NewClient(srv.Client(), nil)
+	c := testClient(t, srv)
 	_, err := c.Do(newReq(t, ctx, http.MethodGet, srv.URL, nil))
 	if err == nil {
 		t.Fatal("expected error on cancelled context")
 	}
 }
 
-func TestNewClient_DoesNotMutateUserClient(t *testing.T) {
-	userClient := &http.Client{Timeout: 10 * time.Second}
-	_ = NewClient(userClient, nil)
-	if userClient.Timeout != 10*time.Second {
-		t.Fatalf("expected timeout 10s, got %v", userClient.Timeout)
+func TestDefaultHTTPClient(t *testing.T) {
+	c := DefaultHTTPClient()
+	if c == nil {
+		t.Fatal("expected non-nil client")
 	}
-	if userClient.Transport != nil {
-		t.Fatal("expected nil transport, got non-nil")
+	if c.Timeout != defaultTimeout {
+		t.Fatalf("expected timeout %v, got %v", defaultTimeout, c.Timeout)
 	}
 }
