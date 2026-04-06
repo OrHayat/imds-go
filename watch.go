@@ -62,6 +62,8 @@ func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context)
 		interval = defaultPollInterval
 	}
 
+	// Buffered to decouple poll rate from consumer speed.
+	// Events are dropped if the buffer is full (consumer too slow).
 	ch := make(chan Event, 32)
 	go pollLoop(ctx, ch, interval, fetch)
 	return ch, nil
