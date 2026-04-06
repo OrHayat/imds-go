@@ -1,0 +1,121 @@
+package httputil
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func TestDo_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.Client(), 2*time.Second)
+	resp, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := ReadBody(resp)
+	if string(body) != "ok" {
+		t.Fatalf("got %q, want %q", body, "ok")
+	}
+}
+
+func TestDo_SetsHeaders(t *testing.T) {
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("X-Test")
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.Client(), 2*time.Second)
+	_, err := c.Do(context.Background(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "hello" {
+		t.Fatalf("header X-Test = %q, want %q", got, "hello")
+	}
+}
+
+func TestDo_RetriesOn5xx(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) < 3 {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.Client(), 5*time.Second)
+	resp, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := ReadBody(resp)
+	if string(body) != "ok" {
+		t.Fatalf("got %q, want %q", body, "ok")
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("expected 3 calls, got %d", calls.Load())
+	}
+}
+
+func TestDo_RetriesOn429(t *testing.T) {
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if calls.Add(1) < 2 {
+			w.WriteHeader(429)
+			return
+		}
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.Client(), 5*time.Second)
+	resp, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := ReadBody(resp)
+	if string(body) != "ok" {
+		t.Fatalf("got %q, want %q", body, "ok")
+	}
+}
+
+func TestDo_MaxRetriesExceeded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.Client(), 5*time.Second)
+	_, err := c.Do(context.Background(), http.MethodGet, srv.URL, nil)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestDo_ContextCancelled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(5 * time.Second)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	c := NewClient(srv.Client(), 10*time.Second)
+	_, err := c.Do(ctx, http.MethodGet, srv.URL, nil)
+	if err == nil {
+		t.Fatal("expected error on cancelled context")
+	}
+}
