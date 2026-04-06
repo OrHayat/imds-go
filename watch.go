@@ -58,7 +58,7 @@ func send(ctx context.Context, ch chan<- Event, ev Event) bool {
 // GCP overrides with long polling instead.
 func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context) (*InstanceMetadata, error)) (<-chan Event, error) {
 	interval := cfg.Interval
-	if interval == 0 {
+	if interval <= 0 {
 		interval = defaultPollInterval
 	}
 
@@ -122,6 +122,9 @@ var watchedFields = []dynamicField{
 // diffMetadata compares dynamic fields between two InstanceMetadata values.
 // Static fields (instance info) are never compared — they don't change on a running instance.
 func diffMetadata(old, new *InstanceMetadata) []string {
+	if old == nil || new == nil {
+		return nil
+	}
 	var changed []string
 	for _, f := range watchedFields {
 		if f.changed(old, new) {
