@@ -101,24 +101,28 @@ func pollOnce(ctx context.Context, ch chan<- Event, old *InstanceMetadata, fetch
 	return cur
 }
 
+// dynamicField defines a field that can change on a running instance.
+type dynamicField struct {
+	name    string
+	changed func(old, new *InstanceMetadata) bool
+}
+
+var watchedFields = []dynamicField{
+	{"interfaces", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.Interfaces, n.Interfaces) }},
+	{"tags", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.Tags, n.Tags) }},
+	{"spot_terminating", func(o, n *InstanceMetadata) bool { return o.SpotTerminating != n.SpotTerminating }},
+	{"maintenance_events", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.MaintenanceEvents, n.MaintenanceEvents) }},
+	{"additional_properties", func(o, n *InstanceMetadata) bool { return !reflect.DeepEqual(o.AdditionalProperties, n.AdditionalProperties) }},
+}
+
 // diffMetadata compares dynamic fields between two InstanceMetadata values.
 // Static fields (instance info) are never compared — they don't change on a running instance.
 func diffMetadata(old, new *InstanceMetadata) []string {
 	var changed []string
-	if !reflect.DeepEqual(old.Interfaces, new.Interfaces) {
-		changed = append(changed, "interfaces")
-	}
-	if !reflect.DeepEqual(old.Tags, new.Tags) {
-		changed = append(changed, "tags")
-	}
-	if old.SpotTerminating != new.SpotTerminating {
-		changed = append(changed, "spot_terminating")
-	}
-	if !reflect.DeepEqual(old.MaintenanceEvents, new.MaintenanceEvents) {
-		changed = append(changed, "maintenance_events")
-	}
-	if !reflect.DeepEqual(old.AdditionalProperties, new.AdditionalProperties) {
-		changed = append(changed, "additional_properties")
+	for _, f := range watchedFields {
+		if f.changed(old, new) {
+			changed = append(changed, f.name)
+		}
 	}
 	return changed
 }

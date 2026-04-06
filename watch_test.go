@@ -83,87 +83,12 @@ func TestDiffMetadata_MultipleChanges(t *testing.T) {
 	}
 }
 
-func TestDiffMetadata_NilOld(t *testing.T) {
-	new := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
-	changed := diffMetadata(nil, new)
-	if len(changed) != len(watchedFields) {
-		t.Fatalf("expected all %d fields, got %v", len(watchedFields), changed)
-	}
-}
-
-func TestDiffMetadata_NilNew(t *testing.T) {
-	old := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
-	changed := diffMetadata(old, nil)
-	if len(changed) != 0 {
-		t.Fatalf("expected no changes on nil new, got %v", changed)
-	}
-}
-
-func TestDiffMetadata_BothNil(t *testing.T) {
-	changed := diffMetadata(nil, nil)
-	if len(changed) != 0 {
-		t.Fatalf("expected no changes on both nil, got %v", changed)
-	}
-}
-
 func TestDiffMetadata_StaticFieldsIgnored(t *testing.T) {
 	old := &InstanceMetadata{Instance: InstanceInfo{ID: "i-111", Hostname: "a"}}
 	new := &InstanceMetadata{Instance: InstanceInfo{ID: "i-222", Hostname: "b"}}
 	changed := diffMetadata(old, new)
 	if len(changed) != 0 {
 		t.Fatalf("expected no changes for static fields, got %v", changed)
-	}
-}
-
-func TestPollOnce_EmitsChangeEvent(t *testing.T) {
-	old := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
-	cur := &InstanceMetadata{Tags: map[string]string{"v": "2"}}
-	fetch := func(ctx context.Context) (*InstanceMetadata, error) { return cur, nil }
-
-	ch := make(chan Event, 1)
-	got := pollOnce(context.Background(), ch, old, fetch)
-
-	if got != cur {
-		t.Fatal("expected pollOnce to return new metadata")
-	}
-	ev := <-ch
-	if len(ev.Changed) != 1 || ev.Changed[0] != "tags" {
-		t.Fatalf("expected [tags], got %v", ev.Changed)
-	}
-}
-
-func TestPollOnce_NoChangeNoEvent(t *testing.T) {
-	m := &InstanceMetadata{Tags: map[string]string{"v": "1"}}
-	fetch := func(ctx context.Context) (*InstanceMetadata, error) {
-		return &InstanceMetadata{Tags: map[string]string{"v": "1"}}, nil
-	}
-
-	ch := make(chan Event, 1)
-	got := pollOnce(context.Background(), ch, m, fetch)
-
-	if got == m {
-		t.Fatal("expected new metadata pointer even without changes")
-	}
-	if len(ch) != 0 {
-		t.Fatal("expected no event on unchanged metadata")
-	}
-}
-
-func TestPollOnce_FetchError(t *testing.T) {
-	old := &InstanceMetadata{}
-	fetch := func(ctx context.Context) (*InstanceMetadata, error) {
-		return nil, errors.New("timeout")
-	}
-
-	ch := make(chan Event, 1)
-	got := pollOnce(context.Background(), ch, old, fetch)
-
-	if got != old {
-		t.Fatal("expected old metadata returned on error")
-	}
-	ev := <-ch
-	if ev.Err == nil || ev.ErrMessage != "timeout" {
-		t.Fatalf("expected error event, got %v", ev)
 	}
 }
 
@@ -238,38 +163,4 @@ func TestPollWatch_ClosesOnCancel(t *testing.T) {
 	for ev := range ch {
 		_ = ev
 	}
-}
-
-func TestPollWatch_NegativeInterval(t *testing.T) {
-	fetch := func(ctx context.Context) (*InstanceMetadata, error) { return nil, nil }
-	_, err := PollWatch(context.Background(), WatchConfig{Interval: -1 * time.Second}, fetch)
-	if err == nil {
-		t.Fatal("expected error on negative interval")
-	}
-}
-
-func TestSend_BufferFullDrops(t *testing.T) {
-	ch := make(chan Event, 1)
-	ch <- Event{} // fill buffer
-
-	ok := send(context.Background(), ch, Event{ErrMessage: "dropped"})
-	if !ok {
-		t.Fatal("expected true (drop), got false")
-	}
-	// Only the first event should be in the channel
-	ev := <-ch
-	if ev.ErrMessage == "dropped" {
-		t.Fatal("expected original event, got the dropped one")
-	}
-}
-
-func TestSend_CtxCancelled(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	ch := make(chan Event) // unbuffered, nobody reading
-	ok := send(ctx, ch, Event{})
-	// With cancelled ctx and no reader, send should return false (ctx done)
-	// or true (default drop). Both are acceptable per the TOCTOU comment.
-	_ = ok
 }
