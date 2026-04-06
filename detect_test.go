@@ -148,3 +148,20 @@ func TestDetectPriority_Empty(t *testing.T) {
 		t.Fatalf("expected ErrNoProvider, got %v", err)
 	}
 }
+
+func TestDetect_BothMatchPrefersFirst(t *testing.T) {
+	// Both providers match — should deterministically return the first one.
+	a := &mockProvider{id: "first", probeOK: true}
+	b := &mockProvider{id: "second", probeOK: true}
+
+	// Run multiple times to catch non-determinism
+	for range 20 {
+		p, err := Detect(context.Background(), a, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p.ID() != "first" {
+			t.Fatalf("expected first, got %s", p.ID())
+		}
+	}
+}
