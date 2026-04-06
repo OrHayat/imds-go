@@ -1,0 +1,25 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - go build ./...
+
+  test:
+    cmds:
+      - go test ./...
+
+  vet:
+    cmds:
+      - go vet ./...
+
+  lint:
+    cmds:
+      - golangci-lint run
+
+  ci:
+    cmds:
+      - task: build
+      - task: vet
+      - task: lint
+      - task: test
