@@ -27,7 +27,7 @@ func (m *mockProvider) Watch(ctx context.Context, cfg WatchConfig) (<-chan Event
 
 func TestDetect_MatchesProvider(t *testing.T) {
 	aws := &mockProvider{id: "aws", probeOK: true}
-	p, err := Detect(context.Background(), aws)
+	p, err := Detect(t.Context(), aws)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestDetect_MatchesProvider(t *testing.T) {
 func TestDetect_SkipsFalseNil(t *testing.T) {
 	notMe := &mockProvider{id: "azure", probeOK: false}
 	isMe := &mockProvider{id: "aws", probeOK: true}
-	p, err := Detect(context.Background(), notMe, isMe)
+	p, err := Detect(t.Context(), notMe, isMe)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestDetect_SkipsFalseNil(t *testing.T) {
 func TestDetect_AllFalseNil(t *testing.T) {
 	a := &mockProvider{id: "aws", probeOK: false}
 	b := &mockProvider{id: "azure", probeOK: false}
-	_, err := Detect(context.Background(), a, b)
+	_, err := Detect(t.Context(), a, b)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -62,7 +62,7 @@ func TestDetect_AllFalseNil(t *testing.T) {
 
 func TestDetect_ProbeError(t *testing.T) {
 	fail := &mockProvider{id: "aws", probeOK: false, probeErr: errors.New("timeout")}
-	_, err := Detect(context.Background(), fail)
+	_, err := Detect(t.Context(), fail)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -74,7 +74,7 @@ func TestDetect_ProbeError(t *testing.T) {
 func TestDetect_ErrorAndMatch(t *testing.T) {
 	fail := &mockProvider{id: "azure", probeOK: false, probeErr: errors.New("timeout")}
 	ok := &mockProvider{id: "aws", probeOK: true}
-	p, err := Detect(context.Background(), fail, ok)
+	p, err := Detect(t.Context(), fail, ok)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,14 +84,14 @@ func TestDetect_ErrorAndMatch(t *testing.T) {
 }
 
 func TestDetect_Empty(t *testing.T) {
-	_, err := Detect(context.Background())
+	_, err := Detect(t.Context())
 	if !errors.Is(err, ErrNoProvider) {
 		t.Fatalf("expected ErrNoProvider, got %v", err)
 	}
 }
 
 func TestDetect_CancelledContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	slow := &mockProvider{id: "aws", probeOK: false, probeErr: context.Canceled}
 	_, err := Detect(ctx, slow)
@@ -103,7 +103,7 @@ func TestDetect_CancelledContext(t *testing.T) {
 func TestDetectPriority_HighPriorityFirst(t *testing.T) {
 	custom := &mockProvider{id: "custom", probeOK: true}
 	aws := &mockProvider{id: "aws", probeOK: true}
-	p, err := DetectPriority(context.Background(),
+	p, err := DetectPriority(t.Context(),
 		Priority(2, aws),
 		Priority(1, custom),
 	)
@@ -118,7 +118,7 @@ func TestDetectPriority_HighPriorityFirst(t *testing.T) {
 func TestDetectPriority_FallsToNextGroup(t *testing.T) {
 	notMe := &mockProvider{id: "custom", probeOK: false}
 	aws := &mockProvider{id: "aws", probeOK: true}
-	p, err := DetectPriority(context.Background(),
+	p, err := DetectPriority(t.Context(),
 		Priority(1, notMe),
 		Priority(2, aws),
 	)
@@ -133,7 +133,7 @@ func TestDetectPriority_FallsToNextGroup(t *testing.T) {
 func TestDetectPriority_AllFail(t *testing.T) {
 	a := &mockProvider{id: "a", probeOK: false}
 	b := &mockProvider{id: "b", probeOK: false}
-	_, err := DetectPriority(context.Background(),
+	_, err := DetectPriority(t.Context(),
 		Priority(1, a),
 		Priority(2, b),
 	)
@@ -143,7 +143,7 @@ func TestDetectPriority_AllFail(t *testing.T) {
 }
 
 func TestDetectPriority_Empty(t *testing.T) {
-	_, err := DetectPriority(context.Background())
+	_, err := DetectPriority(t.Context())
 	if !errors.Is(err, ErrNoProvider) {
 		t.Fatalf("expected ErrNoProvider, got %v", err)
 	}
@@ -156,7 +156,7 @@ func TestDetect_BothMatchPrefersFirst(t *testing.T) {
 
 	// Run multiple times to catch non-determinism
 	for range 20 {
-		p, err := Detect(context.Background(), a, b)
+		p, err := Detect(t.Context(), a, b)
 		if err != nil {
 			t.Fatal(err)
 		}
