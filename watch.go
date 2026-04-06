@@ -11,7 +11,6 @@ const defaultPollInterval = 30 * time.Second
 // WatchConfig controls what is watched and how.
 type WatchConfig struct {
 	Interval time.Duration // polling interval, default 30s
-	Fields   []string      // top-level fields to watch, nil = all
 }
 
 // Event describes a metadata change or poll error.
@@ -62,11 +61,11 @@ func PollWatch(ctx context.Context, cfg WatchConfig, fetch func(context.Context)
 	}
 
 	ch := make(chan Event)
-	go pollLoop(ctx, ch, interval, cfg.Fields, fetch)
+	go pollLoop(ctx, ch, interval, fetch)
 	return ch, nil
 }
 
-func pollLoop(ctx context.Context, ch chan Event, interval time.Duration, fields []string, fetch func(context.Context) (*InstanceMetadata, error)) {
+func pollLoop(ctx context.Context, ch chan Event, interval time.Duration, fetch func(context.Context) (*InstanceMetadata, error)) {
 	defer close(ch)
 
 	old, err := fetch(ctx)
@@ -83,51 +82,36 @@ func pollLoop(ctx context.Context, ch chan Event, interval time.Duration, fields
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			old = pollOnce(ctx, ch, old, fields, fetch)
+			old = pollOnce(ctx, ch, old, fetch)
 		}
 	}
 }
 
-func pollOnce(ctx context.Context, ch chan<- Event, old *InstanceMetadata, fields []string, fetch func(context.Context) (*InstanceMetadata, error)) *InstanceMetadata {
+func pollOnce(ctx context.Context, ch chan<- Event, old *InstanceMetadata, fetch func(context.Context) (*InstanceMetadata, error)) *InstanceMetadata {
 	cur, err := fetch(ctx)
 	if err != nil {
 		send(ctx, ch, errorEvent(err))
 		return old
 	}
 
-	changed := diffMetadata(old, cur, fields)
+	changed := diffMetadata(old, cur)
 	if len(changed) > 0 {
 		send(ctx, ch, changeEvent(old, cur, changed))
 	}
 	return cur
 }
 
-// diffMetadata compares two InstanceMetadata values and returns which
-// top-level fields changed. If fields is non-nil, only those fields are checked.
-func diffMetadata(old, new *InstanceMetadata, fields []string) []string {
-	watching := func(name string) bool {
-		if len(fields) == 0 {
-			return true
-		}
-		for _, f := range fields {
-			if f == name {
-				return true
-			}
-		}
-		return false
-	}
-
+// diffMetadata compares dynamic fields between two InstanceMetadata values.
+// Static fields (instance info) are never compared — they don't change on a running instance.
+func diffMetadata(old, new *InstanceMetadata) []string {
 	var changed []string
-	if watching("instance") && !reflect.DeepEqual(old.Instance, new.Instance) {
-		changed = append(changed, "instance")
-	}
-	if watching("interfaces") && !reflect.DeepEqual(old.Interfaces, new.Interfaces) {
+	if !reflect.DeepEqual(old.Interfaces, new.Interfaces) {
 		changed = append(changed, "interfaces")
 	}
-	if watching("tags") && !reflect.DeepEqual(old.Tags, new.Tags) {
+	if !reflect.DeepEqual(old.Tags, new.Tags) {
 		changed = append(changed, "tags")
 	}
-	if watching("additional_properties") && !reflect.DeepEqual(old.AdditionalProperties, new.AdditionalProperties) {
+	if !reflect.DeepEqual(old.AdditionalProperties, new.AdditionalProperties) {
 		changed = append(changed, "additional_properties")
 	}
 	return changed
