@@ -1,6 +1,9 @@
 package imds
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 // InstanceMetadata is the normalized, cross-provider metadata struct.
 type InstanceMetadata struct {
@@ -28,6 +31,13 @@ type InstanceInfo struct {
 	ImageID      string   `json:"image_id,omitempty"`
 	AccountID    string   `json:"account_id,omitempty"`
 	Hostname     string   `json:"hostname,omitempty"`
+	Architecture string   `json:"architecture,omitempty"`
+}
+
+// RuntimeArchitecture returns the CPU architecture from runtime.GOARCH.
+// Use as a fallback when the provider IMDS does not expose architecture.
+func RuntimeArchitecture() string {
+	return runtime.GOARCH
 }
 
 // Location identifies where an instance is running.
