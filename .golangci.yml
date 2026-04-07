@@ -1,0 +1,48 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    # bodyclose: HTTP response body not closed — critical for IMDS clients
+    - bodyclose
+    # contextcheck: non-inherited context passed to functions
+    - contextcheck
+    # noctx: HTTP requests made without context
+    - noctx
+    # gosec: security issues (hardcoded creds, weak crypto)
+    - gosec
+    # errorlint: improper error wrapping/comparison (errors.Is/As)
+    - errorlint
+    # prealloc: slice preallocation opportunities
+    - prealloc
+    # unconvert: unnecessary type conversions
+    - unconvert
+    # misspell: typos in comments and strings
+    - misspell
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        # Close errors on response bodies/files — just freeing buffers
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*net/http.Response).Body.Close
+        # HTTP handler writes — fails only if client disconnected
+        - (net/http.ResponseWriter).Write
+        # Draining data to discard — error is irrelevant
+        - io.Copy
+
+    gosec:
+      excludes:
+        # G104: same unchecked errors already handled by errcheck config above
+        - G104
+
+  exclusions:
+    rules:
+      # test files: relax some linters
+      - path: '_test\.go'
+        linters:
+          - bodyclose
+          - gosec
+          - noctx
