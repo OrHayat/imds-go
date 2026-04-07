@@ -34,8 +34,21 @@ type InstanceInfo struct {
 	Architecture string   `json:"architecture,omitempty"`
 }
 
+// NormalizeArch maps platform architecture strings to Go convention.
+func NormalizeArch(s string) string {
+	switch s {
+	case "x86_64":
+		return "amd64"
+	case "i386", "i686":
+		return "386"
+	case "aarch64":
+		return "arm64"
+	default:
+		return s
+	}
+}
+
 // RuntimeArchitecture returns the CPU architecture from runtime.GOARCH.
-// Use as a fallback when the provider IMDS does not expose architecture.
 func RuntimeArchitecture() string {
 	return runtime.GOARCH
 }
