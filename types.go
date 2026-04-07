@@ -55,8 +55,9 @@ func RuntimeArchitecture() string {
 
 // Location identifies where an instance is running.
 type Location struct {
-	Region string `json:"region"`
-	Zone   string `json:"zone,omitempty"`
+	Region      string `json:"region"`
+	Zone        string `json:"zone,omitempty"`
+	FaultDomain string `json:"fault_domain,omitempty"`
 }
 
 // NetworkInterface holds network configuration for a single interface.
