@@ -59,10 +59,11 @@ func TestDo_SetsHeaders(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"}))
+	resp, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, map[string]string{"X-Test": "hello"}))
 	if err != nil {
 		t.Fatal(err)
 	}
+	resp.Body.Close()
 	if got != "hello" {
 		t.Fatalf("header X-Test = %q, want %q", got, "hello")
 	}
@@ -122,8 +123,9 @@ func TestDo_MaxRetriesExceeded(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
+	resp, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
 	if err == nil {
+		resp.Body.Close()
 		t.Fatal("expected error")
 	}
 }
@@ -138,8 +140,9 @@ func TestDo_ContextCancelled(t *testing.T) {
 	defer cancel()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, ctx, http.MethodGet, srv.URL, nil))
+	resp, err := c.Do(newReq(t, ctx, http.MethodGet, srv.URL, nil))
 	if err == nil {
+		resp.Body.Close()
 		t.Fatal("expected error on cancelled context")
 	}
 }
@@ -161,7 +164,10 @@ func TestDo_MaxRetriesExceeded_ErrorTypes(t *testing.T) {
 	defer srv.Close()
 
 	c := testClient(t, srv)
-	_, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
+	resp, err := c.Do(newReq(t, t.Context(), http.MethodGet, srv.URL, nil))
+	if err == nil {
+		resp.Body.Close()
+	}
 
 	var retryErr *RetryError
 	if !errors.As(err, &retryErr) {
