@@ -1,20 +1,17 @@
 version: '3'
 
 tasks:
-  build:
-    cmds:
-      - go build ./...
-
   test:
     cmds:
       - go test ./...
+      - cd awsimds && go test ./...
 
   lint:
     cmds:
       - golangci-lint run
+      - cd awsimds && golangci-lint run
 
   ci:
     cmds:
-      - task: build
       - task: lint
       - task: test
