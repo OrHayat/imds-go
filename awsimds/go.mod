@@ -9,3 +9,5 @@ require (
 )
 
 require github.com/aws/smithy-go v1.24.2
+
+require go.mozilla.org/pkcs7 v0.9.0
