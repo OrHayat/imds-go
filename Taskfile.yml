@@ -4,12 +4,10 @@ tasks:
   test:
     cmds:
       - go test ./...
-      - cd awsimds && go test ./...
 
   lint:
     cmds:
       - golangci-lint run
-      - cd awsimds && golangci-lint run
 
   ci:
     cmds:
