@@ -175,10 +175,13 @@ func TestGetMetadata(t *testing.T) {
 	if len(md.MaintenanceEvents) != 1 {
 		t.Fatalf("maintenance events = %d, want 1", len(md.MaintenanceEvents))
 	}
-	if md.MaintenanceEvents[0].Type != "system-reboot" {
+	if md.MaintenanceEvents[0].Type != imdspkg.EventTypeReboot {
 		t.Fatalf("event type = %q", md.MaintenanceEvents[0].Type)
 	}
-	if md.MaintenanceEvents[0].Status != "active" {
+	if md.MaintenanceEvents[0].ProviderType != "system-reboot" {
+		t.Fatalf("event provider type = %q", md.MaintenanceEvents[0].ProviderType)
+	}
+	if md.MaintenanceEvents[0].Status != imdspkg.EventStatusStarted {
 		t.Fatalf("event status = %q", md.MaintenanceEvents[0].Status)
 	}
 
@@ -327,8 +330,11 @@ func TestMaintenanceEvents(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("events = %d", len(events))
 	}
-	if events[0].Type != "system-reboot" {
+	if events[0].Type != imdspkg.EventTypeReboot {
 		t.Fatalf("type = %q", events[0].Type)
+	}
+	if events[0].ProviderType != "system-reboot" {
+		t.Fatalf("provider type = %q", events[0].ProviderType)
 	}
 }
 

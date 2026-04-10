@@ -211,11 +211,11 @@ func TestMaintenanceEvents(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("events = %d, want 2", len(events))
 	}
-	if events[0].Type != "preempt" {
-		t.Errorf("event[0].Type = %q", events[0].Type)
+	if events[0].ProviderType != "preempt" {
+		t.Errorf("event[0].ProviderType = %q", events[0].ProviderType)
 	}
-	if events[1].Type != "reboot" {
-		t.Errorf("event[1].Type = %q", events[1].Type)
+	if events[1].ProviderType != "reboot" {
+		t.Errorf("event[1].ProviderType = %q", events[1].ProviderType)
 	}
 }
 

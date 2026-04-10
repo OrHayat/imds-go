@@ -201,9 +201,11 @@ func (c *Client) MaintenanceEvents(ctx context.Context) ([]imdspkg.MaintenanceEv
 	}
 	var out []imdspkg.MaintenanceEvent
 	for _, e := range events {
+		code := strings.ToLower(e.Code)
 		me := imdspkg.MaintenanceEvent{
-			Type:   strings.ToLower(e.Code),
-			Status: strings.ToLower(e.State),
+			Type:         awsEventType(code),
+			ProviderType: code,
+			Status:       awsEventStatus(strings.ToLower(e.State)),
 		}
 		if t, err := time.Parse(time.RFC3339, e.NotBefore); err == nil {
 			me.Before = t
@@ -211,6 +213,25 @@ func (c *Client) MaintenanceEvents(ctx context.Context) ([]imdspkg.MaintenanceEv
 		out = append(out, me)
 	}
 	return out, nil
+}
+
+func awsEventType(code string) imdspkg.EventType {
+	switch code {
+	case "instance-reboot", "system-reboot":
+		return imdspkg.EventTypeReboot
+	case "system-maintenance":
+		return imdspkg.EventTypeMigrate
+	case "instance-retirement", "instance-stop":
+		return imdspkg.EventTypeTerminate
+	}
+	return ""
+}
+
+func awsEventStatus(state string) imdspkg.EventStatus {
+	if state == "active" {
+		return imdspkg.EventStatusStarted
+	}
+	return ""
 }
 
 func splitLines(s string) []string {

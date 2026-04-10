@@ -53,7 +53,7 @@ func TestDiffMetadata_SpotTerminating(t *testing.T) {
 func TestDiffMetadata_MaintenanceEvents(t *testing.T) {
 	old := &imds.InstanceMetadata{}
 	new := &imds.InstanceMetadata{
-		MaintenanceEvents: []imds.MaintenanceEvent{{Type: "reboot", Status: "scheduled"}},
+		MaintenanceEvents: []imds.MaintenanceEvent{{Type: imds.EventTypeReboot, Status: imds.EventStatusScheduled}},
 	}
 	changed := DiffMetadata(old, new)
 	if len(changed) != 1 || changed[0] != "maintenance_events" {

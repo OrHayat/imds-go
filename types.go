@@ -16,11 +16,32 @@ type InstanceMetadata struct {
 	AdditionalProperties map[string]any      `json:"additional_properties,omitempty"`
 }
 
+// EventType is the normalized maintenance-event category. Provider mappers
+// populate it when a provider-specific code cleanly fits a bucket; if no
+// bucket fits, leave it empty and rely on ProviderType for the verbatim value.
+type EventType string
+
+const (
+	EventTypeReboot    EventType = "reboot"
+	EventTypeTerminate EventType = "terminate"
+	EventTypeMigrate   EventType = "migrate"
+	EventTypePause     EventType = "pause"
+)
+
+// EventStatus is the normalized maintenance-event lifecycle state.
+type EventStatus string
+
+const (
+	EventStatusScheduled EventStatus = "scheduled"
+	EventStatusStarted   EventStatus = "started"
+)
+
 // MaintenanceEvent describes a scheduled maintenance action.
 type MaintenanceEvent struct {
-	Type   string    `json:"type"`   // "reboot", "terminate", "migrate"
-	Status string    `json:"status"` // "scheduled", "started"
-	Before time.Time `json:"before"` // deadline
+	Type         EventType   `json:"type"`          // normalized bucket; "" if no mapping fits
+	ProviderType string      `json:"provider_type"` // verbatim provider event identifier, lowercased
+	Status       EventStatus `json:"status"`
+	Before       time.Time   `json:"before"`
 }
 
 // InstanceInfo holds compute instance details.

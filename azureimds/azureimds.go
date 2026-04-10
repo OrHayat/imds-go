@@ -177,8 +177,8 @@ func toMaintenanceEvents(events []scheduledEvent) []imds.MaintenanceEvent {
 	out := make([]imds.MaintenanceEvent, 0, len(events))
 	for _, e := range events {
 		me := imds.MaintenanceEvent{
-			Type:   strings.ToLower(e.EventType),
-			Status: strings.ToLower(e.EventStatus),
+			ProviderType: strings.ToLower(e.EventType),
+			Status:       imds.EventStatus(strings.ToLower(e.EventStatus)),
 		}
 		if t, err := time.Parse(time.RFC3339, e.NotBefore); err == nil {
 			me.Before = t
