@@ -214,8 +214,57 @@ func TestMaintenanceEvents(t *testing.T) {
 	if events[0].ProviderType != "preempt" {
 		t.Errorf("event[0].ProviderType = %q", events[0].ProviderType)
 	}
+	if events[0].Type != imds.EventTypeTerminate {
+		t.Errorf("event[0].Type = %q, want %q", events[0].Type, imds.EventTypeTerminate)
+	}
+	if events[0].Status != imds.EventStatusScheduled {
+		t.Errorf("event[0].Status = %q, want %q", events[0].Status, imds.EventStatusScheduled)
+	}
 	if events[1].ProviderType != "reboot" {
 		t.Errorf("event[1].ProviderType = %q", events[1].ProviderType)
+	}
+	if events[1].Type != imds.EventTypeReboot {
+		t.Errorf("event[1].Type = %q, want %q", events[1].Type, imds.EventTypeReboot)
+	}
+	if events[1].Status != imds.EventStatusScheduled {
+		t.Errorf("event[1].Status = %q, want %q", events[1].Status, imds.EventStatusScheduled)
+	}
+}
+
+func TestAzureEventTypeMapping(t *testing.T) {
+	cases := []struct {
+		in   string
+		want imds.EventType
+	}{
+		{"Freeze", imds.EventTypePause},
+		{"Reboot", imds.EventTypeReboot},
+		{"Redeploy", imds.EventTypeMigrate},
+		{"Preempt", imds.EventTypeTerminate},
+		{"Terminate", imds.EventTypeTerminate},
+		{"Unknown", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := azureEventType(tc.in); got != tc.want {
+			t.Errorf("azureEventType(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestAzureEventStatusMapping(t *testing.T) {
+	cases := []struct {
+		in   string
+		want imds.EventStatus
+	}{
+		{"Scheduled", imds.EventStatusScheduled},
+		{"Started", imds.EventStatusStarted},
+		{"Completed", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := azureEventStatus(tc.in); got != tc.want {
+			t.Errorf("azureEventStatus(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 
