@@ -13,6 +13,7 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	imdspkg "github.com/OrHayat/imds-go"
+	"github.com/OrHayat/imds-go/internal/watchutil"
 )
 
 const ProviderID imdspkg.ID = "aws"
@@ -106,7 +107,7 @@ func (c *Client) GetMetadata(ctx context.Context) (*imdspkg.InstanceMetadata, er
 }
 
 func (c *Client) Watch(ctx context.Context, cfg imdspkg.WatchConfig) (<-chan imdspkg.Event, error) {
-	return imdspkg.PollWatch(ctx, cfg, c.GetMetadata)
+	return watchutil.PollWatch(ctx, cfg, c.GetMetadata)
 }
 
 func (c *Client) Query(ctx context.Context, path string) ([]byte, error) {
