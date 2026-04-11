@@ -12,6 +12,7 @@ import (
 
 	imds "github.com/OrHayat/imds-go"
 	"github.com/OrHayat/imds-go/internal/httputil"
+	"github.com/OrHayat/imds-go/internal/watchutil"
 )
 
 const ProviderID imds.ID = "azure"
@@ -241,7 +242,7 @@ func (c *Client) Interfaces(ctx context.Context) ([]imds.NetworkInterface, error
 }
 
 func (c *Client) Watch(ctx context.Context, cfg imds.WatchConfig) (<-chan imds.Event, error) {
-	return imds.PollWatch(ctx, cfg, c.GetMetadata)
+	return watchutil.PollWatch(ctx, cfg, c.GetMetadata)
 }
 
 func (c *Client) Query(ctx context.Context, path string) ([]byte, error) {
