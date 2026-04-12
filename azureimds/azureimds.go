@@ -1,3 +1,13 @@
+// Package azureimds is the Azure Instance Metadata Service (IMDS) provider
+// for github.com/OrHayat/imds-go. It offers a client for fetching instance
+// metadata and retrieving signed attested documents, plus standalone
+// verification helpers that parse and validate those documents.
+//
+// The attestation workflow is: GetAttestedDocument fetches a PKCS7 blob
+// from /metadata/attested/document; VerifyAttestedDocument (or
+// VerifyAttestedDocumentWithRoots for off-cloud verifiers with their own
+// trust pool) validates the signature, signer chain, timestamp window,
+// and optional nonce, and returns typed Claims describing the VM.
 package azureimds
 
 import (
