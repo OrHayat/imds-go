@@ -12,18 +12,23 @@ type InstanceDocument struct {
 }
 
 type Compute struct {
-	VMID                 string    `json:"vmId"`
-	Location             string    `json:"location"`
-	Zone                 string    `json:"zone"`
-	VMSize               string    `json:"vmSize"`
-	SubscriptionID       string    `json:"subscriptionId"`
-	Name                 string    `json:"name"`
-	PlatformFaultDomain  string    `json:"platformFaultDomain"`
-	PlatformUpdateDomain string    `json:"platformUpdateDomain"`
-	ResourceGroupName    string    `json:"resourceGroupName"`
-	VMScaleSetName       string    `json:"vmScaleSetName"`
-	StorageProfile       Storage   `json:"storageProfile"`
-	TagsList             []Tag     `json:"tagsList"`
+	VMID                 string  `json:"vmId"`
+	Location             string  `json:"location"`
+	Zone                 string  `json:"zone"`
+	PhysicalZone         string  `json:"physicalZone"`
+	VMSize               string  `json:"vmSize"`
+	SubscriptionID       string  `json:"subscriptionId"`
+	Name                 string  `json:"name"`
+	ResourceID           string  `json:"resourceId"`
+	AzEnvironment        string  `json:"azEnvironment"`
+	OSType               string  `json:"osType"`
+	LicenseType          string  `json:"licenseType"`
+	PlatformFaultDomain  string  `json:"platformFaultDomain"`
+	PlatformUpdateDomain string  `json:"platformUpdateDomain"`
+	ResourceGroupName    string  `json:"resourceGroupName"`
+	VMScaleSetName       string  `json:"vmScaleSetName"`
+	StorageProfile       Storage `json:"storageProfile"`
+	TagsList             []Tag   `json:"tagsList"`
 }
 
 type Storage struct {
@@ -106,18 +111,22 @@ func mapInterfaces(raw []Interface) []imds.NetworkInterface {
 func mapMetadata(raw *InstanceDocument) *imds.InstanceMetadata {
 	c := &raw.Compute
 
-	var additional map[string]any
-	if c.PlatformUpdateDomain != "" || c.ResourceGroupName != "" || c.VMScaleSetName != "" {
-		additional = map[string]any{}
-		if c.PlatformUpdateDomain != "" {
-			additional["platformUpdateDomain"] = c.PlatformUpdateDomain
+	additional := map[string]any{}
+	addIfSet := func(key, val string) {
+		if val != "" {
+			additional[key] = val
 		}
-		if c.ResourceGroupName != "" {
-			additional["resourceGroupName"] = c.ResourceGroupName
-		}
-		if c.VMScaleSetName != "" {
-			additional["vmScaleSetName"] = c.VMScaleSetName
-		}
+	}
+	addIfSet("platformUpdateDomain", c.PlatformUpdateDomain)
+	addIfSet("resourceGroupName", c.ResourceGroupName)
+	addIfSet("vmScaleSetName", c.VMScaleSetName)
+	addIfSet("resourceId", c.ResourceID)
+	addIfSet("azEnvironment", c.AzEnvironment)
+	addIfSet("osType", c.OSType)
+	addIfSet("licenseType", c.LicenseType)
+	addIfSet("physicalZone", c.PhysicalZone)
+	if len(additional) == 0 {
+		additional = nil
 	}
 
 	return &imds.InstanceMetadata{

@@ -20,9 +20,14 @@ func fakeResponse() InstanceDocument {
 			VMID:                 "vm-123",
 			Location:             "eastus",
 			Zone:                 "1",
+			PhysicalZone:         "eastus-az1",
 			VMSize:               "Standard_D2s_v3",
 			SubscriptionID:       "sub-456",
 			Name:                 "my-vm",
+			ResourceID:           "/subscriptions/sub-456/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+			AzEnvironment:        "AzurePublicCloud",
+			OSType:               "Linux",
+			LicenseType:          "Windows_Server",
 			PlatformFaultDomain:  "0",
 			PlatformUpdateDomain: "0",
 			ResourceGroupName:    "my-rg",
@@ -290,7 +295,22 @@ func TestGetMetadata(t *testing.T) {
 		t.Errorf("tags = %v", md.Tags)
 	}
 	if md.AdditionalProperties["resourceGroupName"] != "my-rg" {
-		t.Errorf("additional = %v", md.AdditionalProperties)
+		t.Errorf("additional[resourceGroupName] = %v", md.AdditionalProperties["resourceGroupName"])
+	}
+	if md.AdditionalProperties["resourceId"] != "/subscriptions/sub-456/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm" {
+		t.Errorf("additional[resourceId] = %v", md.AdditionalProperties["resourceId"])
+	}
+	if md.AdditionalProperties["azEnvironment"] != "AzurePublicCloud" {
+		t.Errorf("additional[azEnvironment] = %v", md.AdditionalProperties["azEnvironment"])
+	}
+	if md.AdditionalProperties["osType"] != "Linux" {
+		t.Errorf("additional[osType] = %v", md.AdditionalProperties["osType"])
+	}
+	if md.AdditionalProperties["physicalZone"] != "eastus-az1" {
+		t.Errorf("additional[physicalZone] = %v", md.AdditionalProperties["physicalZone"])
+	}
+	if md.AdditionalProperties["licenseType"] != "Windows_Server" {
+		t.Errorf("additional[licenseType] = %v", md.AdditionalProperties["licenseType"])
 	}
 }
 
