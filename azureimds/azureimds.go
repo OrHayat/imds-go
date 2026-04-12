@@ -29,7 +29,7 @@ const ProviderID imds.ID = "azure"
 
 const (
 	defaultBaseURL    = "http://169.254.169.254"
-	defaultAPIVersion = "2021-02-01"
+	defaultAPIVersion = "2025-04-07"
 )
 
 type options struct {
