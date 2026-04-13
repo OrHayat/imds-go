@@ -22,7 +22,8 @@ const (
 )
 
 type Client struct {
-	http *httputil.Client
+	http     *httputil.Client
+	tokenSrc *ibmTokenSource
 }
 
 func New(opts ...imds.Option) (*Client, error) {
@@ -67,7 +68,7 @@ func New(opts ...imds.Option) (*Client, error) {
 		return nil, fmt.Errorf("ibmimds: build main client: %w", err)
 	}
 
-	return &Client{http: mainClient}, nil
+	return &Client{http: mainClient, tokenSrc: src}, nil
 }
 
 func (c *Client) ID() imds.ID { return ProviderID }
@@ -166,12 +167,23 @@ type ibmTokenSource struct {
 }
 
 func (s *ibmTokenSource) Token(ctx context.Context) (string, error) {
+	raw, err := s.fetchToken(ctx, tokenTTL)
+	if err != nil {
+		return "", err
+	}
+	return "Bearer " + raw, nil
+}
+
+// fetchToken hits the instance identity token endpoint and returns the
+// raw JWT (no "Bearer " prefix). Shared between the Authorization
+// header path and the public GetIdentityToken API.
+func (s *ibmTokenSource) fetchToken(ctx context.Context, expiresIn int) (string, error) {
 	resp, err := s.http.Do(ctx, "/instance_identity/v1/token",
 		httputil.WithMethod(http.MethodPut),
 		httputil.WithQueryParam("version", apiVersion),
 		httputil.WithHeader("Metadata-Flavor", "ibm"),
 		httputil.WithHeader("Content-Type", "application/json"),
-		httputil.WithBody(strings.NewReader(fmt.Sprintf(`{"expires_in":%d}`, tokenTTL))),
+		httputil.WithBody(strings.NewReader(fmt.Sprintf(`{"expires_in":%d}`, expiresIn))),
 	)
 	if err != nil {
 		return "", err
@@ -184,7 +196,7 @@ func (s *ibmTokenSource) Token(ctx context.Context) (string, error) {
 	if tok.AccessToken == "" {
 		return "", fmt.Errorf("ibmimds: token response has empty access_token")
 	}
-	return "Bearer " + tok.AccessToken, nil
+	return tok.AccessToken, nil
 }
 
 type tokenResponse struct {
