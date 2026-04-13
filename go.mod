@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21
 	github.com/aws/smithy-go v1.24.3
 	go.mozilla.org/pkcs7 v0.9.0
+	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.275.0
 	gopkg.in/yaml.v3 v3.0.1
 )
