@@ -1,3 +1,17 @@
+// Package ociimds is the Oracle Cloud Infrastructure Instance Metadata
+// Service (IMDS) provider for github.com/OrHayat/imds-go. It offers a
+// client for fetching instance metadata, retrieving the per-instance
+// x509 identity bundle (leaf cert, intermediate cert, and optionally a
+// nonce-signing private key), and standalone verification helpers that
+// validate the bundle against Oracle's regional root CA.
+//
+// The identity workflow is: GetIdentityDocument fetches cert.pem /
+// intermediate.pem / key.pem from /opc/v2/identity/ on the instance;
+// VerifyIdentityDocument validates the chain against Oracle's regional
+// root CA bundle (fetched from auth.<region>.oraclecloud.com and
+// cached), extracts tenancy/instance/compartment OCIDs from the leaf
+// cert's subject attributes, and optionally verifies an RSA signature
+// over a verifier-supplied nonce to prove freshness.
 package ociimds
 
 import (
