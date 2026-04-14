@@ -201,9 +201,11 @@ func (c *Client) MaintenanceEvents(ctx context.Context) ([]imdspkg.MaintenanceEv
 	}
 	var out []imdspkg.MaintenanceEvent
 	for _, e := range events {
+		code := strings.ToLower(e.Code)
 		me := imdspkg.MaintenanceEvent{
-			Type:   strings.ToLower(e.Code),
-			Status: strings.ToLower(e.State),
+			Type:         awsEventType(code),
+			ProviderType: code,
+			Status:       awsEventStatus(strings.ToLower(e.State)),
 		}
 		if t, err := time.Parse(time.RFC3339, e.NotBefore); err == nil {
 			me.Before = t
@@ -211,6 +213,40 @@ func (c *Client) MaintenanceEvents(ctx context.Context) ([]imdspkg.MaintenanceEv
 		out = append(out, me)
 	}
 	return out, nil
+}
+
+// awsEventType maps the AWS EC2 scheduled-event Code field to the normalized
+// imds.EventType. Categorization matches aws-node-termination-handler: the
+// four "restart" codes (instance-reboot, system-reboot, instance-stop,
+// instance-retirement) all imply "workload briefly goes down and comes back"
+// from the user's perspective and map to Reboot. system-maintenance is a
+// temporary network/power impact with the VM staying in place, so it maps
+// to Pause.
+//
+// References:
+//   - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-instances-status-check_sched.html
+//   - https://github.com/aws/aws-node-termination-handler (isRestartEvent)
+func awsEventType(code string) imdspkg.EventType {
+	switch code {
+	case "instance-reboot", "system-reboot", "instance-stop", "instance-retirement":
+		return imdspkg.EventTypeReboot
+	case "system-maintenance":
+		return imdspkg.EventTypePause
+	}
+	return ""
+}
+
+// awsEventStatus maps the AWS EC2 scheduled-event State field to the
+// normalized imds.EventStatus. AWS documents three State values (active,
+// completed, canceled), but only "active" appears in the
+// /events/maintenance/scheduled endpoint — completed and canceled live in
+// /events/maintenance/history. AWS does not distinguish "scheduled" from
+// "started" the way Azure does, so active maps to Scheduled.
+func awsEventStatus(state string) imdspkg.EventStatus {
+	if state == "active" {
+		return imdspkg.EventStatusScheduled
+	}
+	return ""
 }
 
 func splitLines(s string) []string {

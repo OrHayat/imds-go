@@ -496,18 +496,18 @@ func gcpMaintenanceEvents(event string) []imds.MaintenanceEvent {
 	if event == "" || event == "NONE" {
 		return nil
 	}
-	eventType := strings.ToLower(event)
+	var eventType imds.EventType
 	switch strings.ToUpper(event) {
 	case "MIGRATE_ON_HOST_MAINTENANCE", "MIGRATE":
-		eventType = "migrate"
+		eventType = imds.EventTypeMigrate
 	case "TERMINATE_ON_HOST_MAINTENANCE", "TERMINATE", "SHUTDOWN_ON_HOST_MAINTENANCE":
-		eventType = "terminate"
+		eventType = imds.EventTypeTerminate
 	case "REBOOT":
-		eventType = "reboot"
+		eventType = imds.EventTypeReboot
 	}
 	return []imds.MaintenanceEvent{{
 		Type:   eventType,
-		Status: "scheduled",
+		Status: imds.EventStatusScheduled,
 	}}
 }
 

@@ -177,8 +177,9 @@ func toMaintenanceEvents(events []scheduledEvent) []imds.MaintenanceEvent {
 	out := make([]imds.MaintenanceEvent, 0, len(events))
 	for _, e := range events {
 		me := imds.MaintenanceEvent{
-			Type:   strings.ToLower(e.EventType),
-			Status: strings.ToLower(e.EventStatus),
+			Type:         azureEventType(e.EventType),
+			ProviderType: strings.ToLower(e.EventType),
+			Status:       azureEventStatus(e.EventStatus),
 		}
 		if t, err := time.Parse(time.RFC3339, e.NotBefore); err == nil {
 			me.Before = t
@@ -186,6 +187,37 @@ func toMaintenanceEvents(events []scheduledEvent) []imds.MaintenanceEvent {
 		out = append(out, me)
 	}
 	return out
+}
+
+// azureEventType maps the Azure Scheduled Events EventType field to the
+// normalized imds.EventType. The documented set of values is Freeze, Reboot,
+// Redeploy, Preempt, Terminate.
+// Reference: https://learn.microsoft.com/azure/virtual-machines/linux/scheduled-events
+func azureEventType(s string) imds.EventType {
+	switch s {
+	case "Freeze":
+		return imds.EventTypePause
+	case "Reboot":
+		return imds.EventTypeReboot
+	case "Redeploy":
+		return imds.EventTypeMigrate
+	case "Preempt", "Terminate":
+		return imds.EventTypeTerminate
+	}
+	return ""
+}
+
+// azureEventStatus maps the Azure Scheduled Events EventStatus field to the
+// normalized imds.EventStatus. The documented set of values is Scheduled,
+// Started (the event is removed from the array upon completion).
+func azureEventStatus(s string) imds.EventStatus {
+	switch s {
+	case "Scheduled":
+		return imds.EventStatusScheduled
+	case "Started":
+		return imds.EventStatusStarted
+	}
+	return ""
 }
 
 // getScheduledEvents pins api-version to 2020-07-01 independent of WithAPIVersion,

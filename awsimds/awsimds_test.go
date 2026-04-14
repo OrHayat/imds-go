@@ -175,10 +175,13 @@ func TestGetMetadata(t *testing.T) {
 	if len(md.MaintenanceEvents) != 1 {
 		t.Fatalf("maintenance events = %d, want 1", len(md.MaintenanceEvents))
 	}
-	if md.MaintenanceEvents[0].Type != "system-reboot" {
+	if md.MaintenanceEvents[0].Type != imdspkg.EventTypeReboot {
 		t.Fatalf("event type = %q", md.MaintenanceEvents[0].Type)
 	}
-	if md.MaintenanceEvents[0].Status != "active" {
+	if md.MaintenanceEvents[0].ProviderType != "system-reboot" {
+		t.Fatalf("event provider type = %q", md.MaintenanceEvents[0].ProviderType)
+	}
+	if md.MaintenanceEvents[0].Status != imdspkg.EventStatusScheduled {
 		t.Fatalf("event status = %q", md.MaintenanceEvents[0].Status)
 	}
 
@@ -327,8 +330,48 @@ func TestMaintenanceEvents(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("events = %d", len(events))
 	}
-	if events[0].Type != "system-reboot" {
+	if events[0].Type != imdspkg.EventTypeReboot {
 		t.Fatalf("type = %q", events[0].Type)
+	}
+	if events[0].ProviderType != "system-reboot" {
+		t.Fatalf("provider type = %q", events[0].ProviderType)
+	}
+}
+
+func TestAWSEventTypeMapping(t *testing.T) {
+	cases := []struct {
+		in   string
+		want imdspkg.EventType
+	}{
+		{"instance-reboot", imdspkg.EventTypeReboot},
+		{"system-reboot", imdspkg.EventTypeReboot},
+		{"instance-stop", imdspkg.EventTypeReboot},
+		{"instance-retirement", imdspkg.EventTypeReboot},
+		{"system-maintenance", imdspkg.EventTypePause},
+		{"unknown-code", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := awsEventType(tc.in); got != tc.want {
+			t.Errorf("awsEventType(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestAWSEventStatusMapping(t *testing.T) {
+	cases := []struct {
+		in   string
+		want imdspkg.EventStatus
+	}{
+		{"active", imdspkg.EventStatusScheduled},
+		{"completed", ""},
+		{"canceled", ""},
+		{"", ""},
+	}
+	for _, tc := range cases {
+		if got := awsEventStatus(tc.in); got != tc.want {
+			t.Errorf("awsEventStatus(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 
