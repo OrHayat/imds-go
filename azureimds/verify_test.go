@@ -288,7 +288,6 @@ func TestVerifyAttestedDocumentNonAzureIssuerRejected(t *testing.T) {
 	}
 }
 
-
 func TestGetAttestedDocument(t *testing.T) {
 	f := newTestFixture(t)
 	payload := samplePayload("nonce-42", time.Now().Add(-time.Minute), time.Now().Add(5*time.Minute))
